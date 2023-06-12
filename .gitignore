@@ -1,0 +1,8 @@
+bin/
+obj/
+.vs
+.idea
+.vscode
+ToDoList/MyDatabase.db
+ToDoList/MyDatabase.db-shm
+ToDoList/MyDatabase.db-wal
