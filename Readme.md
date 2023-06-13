@@ -19,6 +19,8 @@ To update the database with the new migrations, execute this command
 dotnet ef database create
 ```
 To run the application it is necessary to have a GitHub application and change the values:
-    "ClientId": "",
-    "ClientSecret": "",
+```
+"ClientId": "",
+"ClientSecret": "",
+```
 under GitHubConfiguration in the file "appsettings.json", or contact the developer for the ClientSecret.
