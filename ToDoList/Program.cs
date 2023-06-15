@@ -15,10 +15,6 @@ builder.Services.AddDbContext<AppDbContext>()
 
 // Add services to the container.
 // Adding the dependency. The lifetime of the dependency is managed by the DI baked in the Framework.
-// There are three different types of lifetimes:
-// - Transient: create the object every time the requestor class needs it
-// - Scoped: create the object every time a new scope is declared (A single request is a scope by itself)
-// - Singleton: a single instance of the class. Try changing this dependency to Singleton.
 builder.Services.AddScoped<IToDoListService, ToDoListService>();
 builder.Services.AddScoped<IToDoListItemService, ToDoListItemService>();
 
