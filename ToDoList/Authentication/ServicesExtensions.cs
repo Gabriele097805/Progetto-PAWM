@@ -19,21 +19,20 @@ public static class AuthenticationConfigurationExtensions
         return githubConfiguration;
     }
 
-    private static OAuthEvents GetOAuthEvents() =>
-        new OAuthEvents
+    private static OAuthEvents GetOAuthEvents() => new()
+    {
+        OnCreatingTicket = async context =>
         {
-            OnCreatingTicket = async context =>
-            {
-                var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
-                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
-                var response = await context.Backchannel.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, context.HttpContext.RequestAborted);
-                response.EnsureSuccessStatusCode();
-                var bodyAsString = await response.Content.ReadAsStringAsync();
-                JsonElement user = JsonDocument.Parse(bodyAsString).RootElement;
-                context.RunClaimActions(user!);
-            }
-        };
+            var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
+            var response = await context.Backchannel.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, context.HttpContext.RequestAborted);
+            response.EnsureSuccessStatusCode();
+            var bodyAsString = await response.Content.ReadAsStringAsync();
+            JsonElement user = JsonDocument.Parse(bodyAsString).RootElement;
+            context.RunClaimActions(user!);
+        }
+    };
 
     public static IServiceCollection AddGitHubOAuth(this IServiceCollection services, ConfigurationManager configuration)
     {
@@ -42,15 +41,22 @@ public static class AuthenticationConfigurationExtensions
             options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
             options.DefaultChallengeScheme = "GitHub";
         })
-        .AddCookie()
+        .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
+        {
+            options.Cookie.SameSite = SameSiteMode.Strict;
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        })
         .AddOAuth("GitHub", options =>
         {
+            options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
+
             var githubConfiguration = configuration.ExtractConfiguration();
-            options.ClientId = githubConfiguration.ClientId ?? 
+            options.ClientId = githubConfiguration.ClientId ??
                 throw new ArgumentNullException("GitHub client id is null");
-            options.ClientSecret = githubConfiguration.ClientSecret ?? 
+            options.ClientSecret = githubConfiguration.ClientSecret ??
                 throw new ArgumentNullException("GitHub client secret is null");
             options.CallbackPath = new PathString("/api/signin-github");
+            // options.AuthorizationEndpoint = "https://github.com/login/oauth/authorize";
             options.AuthorizationEndpoint = "https://github.com/login/oauth/authorize";
             options.TokenEndpoint = "https://github.com/login/oauth/access_token";
             options.UserInformationEndpoint = "https://api.github.com/user";
@@ -70,7 +76,7 @@ public static class AuthenticationConfigurationExtensions
     private static int? GetClaimIntValue(this IEnumerable<Claim> claims, string claimType)
     {
         var claimValue = claims.GetClaimValue(claimType);
-        
+
         if (claimValue is not null && int.TryParse(claimValue, out var intValue))
         {
             return intValue;
@@ -79,7 +85,7 @@ public static class AuthenticationConfigurationExtensions
         return null;
     }
 
-    public static User? TryGetUser(this ControllerBase controller) 
+    public static User? TryGetUser(this ControllerBase controller)
     {
         var claims = controller.User.Claims;
 
@@ -92,9 +98,9 @@ public static class AuthenticationConfigurationExtensions
 
         return info switch
         {
-            (var id, var name, var avatar, var uri) when id is {} notNullId && !string.IsNullOrWhiteSpace(name) => 
+            (var id, var name, var avatar, var uri) when id is { } notNullId && !string.IsNullOrWhiteSpace(name) =>
                 new User(notNullId, name, uri, avatar),
-            _ => 
+            _ =>
                 null
         };
     }
@@ -108,7 +114,7 @@ public static class AuthenticationConfigurationExtensions
     /// If the user is null, it throws this exception
     /// </exception>
     public static User GetUser(this ControllerBase controller) =>
-        controller.TryGetUser() switch 
+        controller.TryGetUser() switch
         {
             null => throw new UserNotFoundException(),
             var u => u
